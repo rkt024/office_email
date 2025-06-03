@@ -1,51 +1,100 @@
 import sqlite3
 import csv
+import os
 
-# Function to import CSV data into SQLite database
 def import_csv_to_db(csv_file, db_file):
-    # Connect to the SQLite database (it will create the file if it doesn't exist)
-    conn = sqlite3.connect(db_file)
-    cursor = conn.cursor()
+    # Validate input files
+    if not os.path.isfile(csv_file):
+        print(f"Error: CSV file '{csv_file}' does not exist.")
+        return
+    if not db_file:
+        print("Error: Database file path cannot be empty.")
+        return
 
-    # Open the CSV file
-    with open(csv_file, 'r') as file:
-        # Create a CSV reader
-        csv_reader = csv.DictReader(file)
+    inserted_count = 0
+    failed_count = 0
+    total_rows = 0
 
-        # Prepare SQL query for inserting data
-        insert_query = '''INSERT INTO transactions (ref_number, bank_name, date)
-                          VALUES (?, ?, ?)'''
+    try:
+        # Connect to the database using context manager
+        with sqlite3.connect(db_file) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            cursor = conn.cursor()
+            
+            # Create table if not exists
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ref_number TEXT,
+                    bank_name TEXT NOT NULL,
+                    date TEXT NOT NULL
+                )
+            ''')
+            
+            # Open CSV file
+            with open(csv_file, 'r') as file:
+                csv_reader = csv.DictReader(file)
+                
+                if not all(col in csv_reader.fieldnames for col in ['ref_number', 'bank_name', 'date']):
+                    print("Error: CSV file is missing required columns")
+                    return
+                
+                # Process each row
+                for row in csv_reader:
+                    try:
+                        # Validate required fields
+                        if not all(row.get(col) for col in ['ref_number', 'bank_name', 'date']):
+                            raise ValueError("Missing required field(s)")
+                            
+                        # Prepare data
+                        ref_number = row['ref_number'].strip()
+                        bank_name = row['bank_name'].strip()
+                        date = row['date'].strip()
+                        
+                        # Insert record
+                        cursor.execute(
+                            '''INSERT INTO transactions (ref_number, bank_name, date)
+                               VALUES (?, ?, ?)''',
+                            (ref_number, bank_name, date)
+                        )
+                        inserted_count += 1
+                        
+                    except (ValueError, KeyError) as e:
+                        print(f"Data error in row: {row} - {str(e)}")
+                        failed_count += 1
+                    except sqlite3.IntegrityError as e:
+                        print(f"Duplicate ref_number '{ref_number}' - {str(e)}")
+                        failed_count += 1
+                    except sqlite3.Error as e:
+                        print(f"Database error on row: {row} - {str(e)}")
+                        failed_count += 1
+                    except Exception as e:
+                        print(f"Unexpected error on row: {row} - {str(e)}")
+                        failed_count += 1
+                
+                # Get total rows after insertion
+                cursor.execute("SELECT COUNT(*) FROM transactions")
+                total_rows = cursor.fetchone()[0]
+                
+    except sqlite3.Error as e:
+        print(f"Database connection error: {str(e)}")
+        return
+    except (IOError, OSError) as e:
+        print(f"File I/O error: {str(e)}")
+        return
+    except csv.Error as e:
+        print(f"CSV parsing error: {str(e)}")
+        return
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return
 
-        # Initialize a counter for inserted rows
-        inserted_count = 0
-
-        # Loop through CSV rows and insert data into the database
-        for row in csv_reader:
-            # Extract the data from each row
-            ref_number = row['ref_number']
-            bank_name = row['bank_name']
-            date = row['date']
-
-            # Execute the insert query
-            cursor.execute(insert_query, (ref_number, bank_name, date))
-            inserted_count += 1  # Increment the counter
-
-    # Commit changes and close the connection
-    conn.commit()
-
-    # Query to count the total number of rows in the table
-    cursor.execute("SELECT COUNT(*) FROM transactions")
-    total_rows = cursor.fetchone()[0]  # Fetch the result of the COUNT query
-
-    conn.close()
-
-    # Print the results
-    print(f"Data from {csv_file} has been successfully imported into {db_file}.")
-    print(f"{inserted_count} rows were inserted.")
-    print(f"Total rows in the database: {total_rows}")
+    # Print summary
+    print(f"Import completed: {inserted_count} rows inserted, {failed_count} rows failed")
+    print(f"Total rows in database: {total_rows}")
 
 # Usage
-csv_file = 'transactions.csv'  # Path to your CSV file
-db_file = 'database.db'        # Path to your SQLite database file
-
-import_csv_to_db(csv_file, db_file)
+if __name__ == "__main__":
+    csv_file = 'email_records.csv'
+    db_file = 'email_records.db'
+    import_csv_to_db(csv_file, db_file)
