@@ -9,7 +9,7 @@ class TransactionManager:
     A console-based transaction management system with SQLite database integration.
     """
     
-    def __init__(self, db_name="transactions.db"):
+    def __init__(self, db_name="email_records.db"):
         """Initialize the database connection and create table if not exists."""
         # Validate and sanitize database name
         if not re.fullmatch(r'[\w\-\.]+\.db', db_name):
@@ -17,9 +17,13 @@ class TransactionManager:
         self.db_name = os.path.basename(db_name)  # Prevent path traversal
         
         self.bank_codes = {
-            "PCBL": "PRIME COMMERCIAL BANK",
-            "GBBL": "GARIMA BIKASH BANK",
-            "MBL": "MACHHAPUCHRE BANK"
+            "CIT": "CITIZEN INVESTMENT TRUST",
+            "EPF": "EMPLOYEE PROVIDENT FUND",
+            "GBBL": "GARIMA BIKAS BANK LTD",
+            "MNBBL": "MUKTINATH BIKASH BANK LTD",
+            "NIMB": "NEPAL INVESTMENT MEGA BANK LTD",
+            "PCBL": "PRIME COMMERCIAL BANK LTD",
+            "SADBL": "SHANGRILA DEVELOPMENT BANK LTD"
         }
         self.init_database()
     
@@ -45,7 +49,7 @@ class TransactionManager:
             
             conn.commit()
             conn.close()
-            print(f"Database '{self.db_name}' initialized successfully.")
+            # print(f"Database '{self.db_name}' initialized successfully.")
         except sqlite3.Error as e:
             print(f"Error initializing database: {e}")
     
@@ -119,7 +123,7 @@ class TransactionManager:
         try:
             # Get and format reference number
             while True:
-                number_input = input("Enter a number (e.g., 4651, 453, 10245): ").strip()
+                number_input = input("Enter a number (e.g., 453, 4561, 10245): ").strip()
                 if number_input:
                     try:
                         ref_number = self.format_reference_number(number_input)
@@ -243,11 +247,11 @@ class TransactionManager:
         records.sort(key=lambda x: x[1])
         
         print(f"\n=== {title.upper()} ===")
-        print(f"{'ID':<5} {'Reference':<12} {'Bank Name':<25} {'Date':<12}")
+        print(f"{'ID':<5} {'Reference':<12} {'Bank Name':<30} {'Date':<12}")
         print("-" * 60)
         
         for record in records:
-            print(f"{record[0]:<5} {record[1]:<12} {record[2]:<25} {record[3]:<12}")
+            print(f"{record[0]:<5} {record[1]:<12} {record[2]:<30} {record[3]:<12}")
         
         print(f"\nTotal records: {len(records)}")
     
@@ -259,6 +263,7 @@ class TransactionManager:
             
             cursor.execute("SELECT * FROM transactions ORDER BY ref_number ASC")
             records = cursor.fetchall()
+            # print("Records fetched:", records)
             conn.close()
             
             self.display_records(records, "All Records")
@@ -291,11 +296,11 @@ class TransactionManager:
     def filter_by_bank(self):
         """Filter records by bank name, partial name, or bank code."""
         print(f"\nAvailable bank codes: {', '.join(self.bank_codes.keys())}")
-        print(f"Available bank names: {', '.join(self.bank_codes.values())}")
+        # print(f"Available bank names: {', '.join(self.bank_codes.values())}")
         print("You can enter:")
         print("- Full bank name (e.g., 'PRIME COMMERCIAL BANK')")
         print("- Partial bank name (e.g., 'PRIME', 'COMMERCIAL')")
-        print("- Bank code (e.g., 'PCBL', 'GBBL', 'MBL')")
+        print("- Bank code (e.g., 'PCBL', 'GBBL', 'EPF')")
         
         bank_input = input("\nEnter bank code, full name, or partial name: ").strip()
         
